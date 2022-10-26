@@ -52,7 +52,7 @@ class WassersteinGAN(tf.keras.Model):
         else:
             return tf.reduce_mean(fake_output)
 
-    
+    @tf.function
     def _train_critic(self, real_image, batch_size):
         '''
             Trains the Critic of the WGAN for one epoch, based on the real_image, a batch_size.
@@ -79,7 +79,8 @@ class WassersteinGAN(tf.keras.Model):
         self._apply_gradients(zip(grad, self.critic_model.trainable_variables))  #perform RMSProp Gradient Descent Step
 
         return loss
-
+    
+    @tf.function
     def _train_generator(self, batch_size, real_image):
         ''' 
             Trains the Generator of the WGAN for one epoch, based on real_image, a batch_size.
@@ -132,7 +133,12 @@ class WassersteinGAN(tf.keras.Model):
                     self._image_utility(self.generator_model, epoch, [noise], save_path)
         
         return c_losses, g_losses
-                
+    
+    def predict(self, input_data):
+        '''
+            Utility to perform inference from the trained model.
+        '''
+        return self.generator_model.predict(input_data)
 
 
                 
