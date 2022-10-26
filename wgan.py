@@ -1,4 +1,4 @@
-from gettext import npgettext
+
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,34 +13,34 @@ class WassersteinGAN(tf.keras.Model):
         self.critic_epoch = critic_epoch
         #define generator model with upsampling layers
         self.generator_model = tf.keras.Sequential()
-        self.generator_model.add(tf.keras.layers.Dense(7*7*256, use_bias=False, input_shape=(100,)))
+        self.generator_model.add(tf.keras.layers.Dense(7*7*256, use_bias=False, input_shape=(latent_dim,)))
         self.generator_model.add(tf.keras.layers.BatchNormalization())
         self.generator_model.add(tf.keras.layers.LeakyReLU())
 
         self.generator_model.add(tf.keras.layers.Reshape((7, 7, 256)))
 
-        self.generator_model.add(tf.keras.layers.Conv2DTranspose(128, (5, 5), strides=(1, 1), padding='same'), use_bias=False)
+        self.generator_model.add(tf.keras.layers.Conv2DTranspose(128, (5, 5), strides=(1, 1), padding='same', use_bias=False))
         self.generator_model.add(tf.keras.layers.BatchNormalization())
         self.generator_model.add(tf.keras.layers.LeakyReLU())
 
-        self.generator_model.add(tf.keras.layers.Conv2DTranspose(64, (5, 5), strides=(2, 2), padding='same'), use_bias=False)
-        self.generator_model.add(tf.keras.layers.batchNormalization())
+        self.generator_model.add(tf.keras.layers.Conv2DTranspose(64, (5, 5), strides=(2, 2), padding='same', use_bias=False))
+        self.generator_model.add(tf.keras.layers.BatchNormalization())
         self.generator_model.add(tf.keras.layers.LeakyReLU())
 
-        self.generator_model.add(tf.keras.layers.Conv2DTranspose(1, (5, 5), strides=(2, 2), padding="same"), use_bias=False, activation='tanh')
+        self.generator_model.add(tf.keras.layers.Conv2DTranspose(1, (5, 5), strides=(2, 2), padding="same", use_bias=False, activation='tanh'))
 
         #define critic model with downsampling layers
         self.critic_model = tf.keras.Sequential()
-        self.critic_model.add(tf.keras.layers.ConvD(64, (5, 5), strides=(2, 2), padding='same', input_shape=[28, 28, 1]))
+        self.critic_model.add(tf.keras.layers.Conv2D(64, (5, 5), strides=(2, 2), padding='same', input_shape=input_size))
         self.critic_model.add(tf.keras.layers.LeakyReLU())
-        self.critic_model.add(tf.keras.layes.Dropout(0.3))
+        self.critic_model.add(tf.keras.layers.Dropout(0.3))
         self.critic_model.add(tf.keras.layers.Conv2D(128, (5, 5), strides=(2, 2), padding='same'))
         self.critic_model.add(tf.keras.layers.LeakyReLU())
         self.critic_model.add(tf.keras.layers.Dropout(0.3))
         self.critic_model.add(tf.keras.layers.Flatten())
         self.critic_model.add(tf.keras.layers.Dense(1))
 
-        self._optimizer = tf.keras.Optimizers.RMSProp()
+        self._optimizer = tf.keras.optimizers.RMSprop()
     
     def earthmover(self, real_output, fake_output, mode):
         '''
@@ -59,7 +59,7 @@ class WassersteinGAN(tf.keras.Model):
         '''
 
         random_noise = tf.random.normal([batch_size, self.latent_dim])
-        sigma = tf.random.uniform(shape=[batch_size, 1, 1, 1], min_val=0, max_val=1) #sample a random tensor of shape (batch_szie, 1, 1, 1) between 0 and 1.
+        sigma = tf.random.uniform(shape=[batch_size, 1, 1, 1], minval=0, maxval=1) #sample a random tensor of shape (batch_szie, 1, 1, 1) between 0 and 1.
         with tf.GradientTape(persistent=True) as critic_tape:
             with tf.GradientTape() as tape:
                 fake_image = self.generator_model([random_noise], training=True)  #generate a fake image based on sampled noise from the latent dimension
@@ -76,12 +76,12 @@ class WassersteinGAN(tf.keras.Model):
             loss = self.earthmover(real_preds, fake_preds, mode="critic") + clip
         
         grad = critic_tape.gradient(loss, self.critic_model.trainable_variables) #calculate gradients for earthmover loss w.r.t critic model
-        self._apply_gradients(zip(grad, self.critic_model.trainable_variables))  #perform RMSProp Gradient Descent Step
+        self._optimizer.apply_gradients(zip(grad, self.critic_model.trainable_variables))  #perform RMSProp Gradient Descent Step
 
         return loss
     
     @tf.function
-    def _train_generator(self, batch_size, real_image):
+    def _train_generator(self, real_image, batch_size):
         ''' 
             Trains the Generator of the WGAN for one epoch, based on real_image, a batch_size.
         '''
@@ -89,7 +89,7 @@ class WassersteinGAN(tf.keras.Model):
         random_noise = tf.random.normal([batch_size, self.latent_dim])
         with tf.GradientTape() as generator_tape:
             fake_image = self.generator_model([random_noise], training=True)
-            fake_preds = self.critic_model(fake_image, training=True)
+            fake_preds = self.critic_model([fake_image], training=True)
             loss = self.earthmover(real_image, fake_preds, mode="generator") #calculates Earth Mover for generator
 
         grads = generator_tape.gradient(loss, self.generator_model.trainable_variables)
@@ -117,12 +117,13 @@ class WassersteinGAN(tf.keras.Model):
         ''' 
             Cumulative training step for WGAN, training both generator and critic together.
         '''
-        noise = tf.random.normal([18, self.latent_dim])
+        noise = tf.random.normal([16, self.latent_dim])
         critic_epochs = 0
         c_losses, g_losses = [], []
         for epoch in range(num_epochs):
             for step, (image) in enumerate(train_data):
                 batch_size = image.shape[0]
+                print(image.shape)
                 c_loss = self._train_critic(image, tf.constant(batch_size, dtype=tf.int64))
                 c_losses.append(c_loss)
                 critic_epochs += 1
@@ -130,7 +131,7 @@ class WassersteinGAN(tf.keras.Model):
                     g_loss = self._train_generator(image, tf.constant(batch_size, dtype=tf.int64))
                     g_losses.append(g_loss)
                     critic_epochs = 0
-                    self._image_utility(self.generator_model, epoch, [noise], save_path)
+                    #self._image_utility(self.generator_model, epoch, [noise], save_path)
         
         return c_losses, g_losses
     
