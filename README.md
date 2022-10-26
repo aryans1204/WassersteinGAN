@@ -9,7 +9,7 @@ Then simply in your Python file, make an impot statement as such:
 
 `from wgan import WassersteinGAN`
 
-There are multiple utilities provided, but three may be of msot importance:
+There are multiple utilities provided, but three may be of most importance:
 
 `WassersteinGAN()` model initializer.
 
