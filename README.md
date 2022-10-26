@@ -5,7 +5,7 @@ Instructions to use:
 
 `git clone ...` into your working directory
 
-Then simply in your Pythin file, make an impot statement as such:
+Then simply in your Python file, make an impot statement as such:
 
 `from wgan import WassersteinGAN`
 
