@@ -1,5 +1,5 @@
 # WassersteinGAN
-This is my implementation of the WassersteinGAN using Tensorflow 2.9
+This is my implementation of the WassersteinGAN (Generative Adversarial Network) using Tensorflow 2.9
 
 Instructions to use:
 
